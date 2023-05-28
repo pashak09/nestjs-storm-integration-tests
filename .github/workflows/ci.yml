@@ -1,0 +1,143 @@
+name: CI
+
+on: [ push ]
+
+env:
+  NODE_VERSION: 18.16.0
+  MYSQL_DATABASE: test
+  MYSQL_ROOT_PASSWORD: typeorm
+  MYSQL_VERSION: mysql:8.0.23
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Use Nodejs ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: ${{ runner.os }}-node-${{ env.NODE_VERSION }}-deps
+
+      - name: Install yarn packages
+        run: yarn install --frozen-lockfile
+
+      - name: Build
+        run: yarn build
+
+  lint:
+    name: Lint
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Use Nodejs ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: ${{ runner.os }}-node-${{ env.NODE_VERSION }}-deps
+
+      - name: Install yarn packages
+        run: yarn install --frozen-lockfile
+
+      - name: Run linting
+        run: yarn lint
+
+  integration_tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Use Nodejs ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: ${{ runner.os }}-node-${{ env.NODE_VERSION }}-deps
+
+      - name: Install yarn packages
+        run: yarn install --frozen-lockfile
+
+      - name: Start MySQL container
+        run: |
+          docker run --name mysql-container \
+            -e MYSQL_ROOT_PASSWORD=${{ env.MYSQL_ROOT_PASSWORD }} \
+            -e MYSQL_DATABASE=${{ env.MYSQL_DATABASE }} \
+            -p 3306:3306 \
+            --health-cmd "mysqladmin ping" \
+            --health-interval 10s \
+            --health-timeout 5s \
+            --health-retries 10 \
+            -d ${{ env.MYSQL_VERSION }} \
+            --character-set-server=utf8mb4 \
+            --collation-server=utf8mb4_unicode_ci \
+            --sql_mode="ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+        timeout-minutes: 2
+
+      - name: Wait for MySQL to start
+        run: |
+          retries=20
+          while [ $retries -gt 0 ]; do
+            status=$(docker ps -f "name=mysql-container" --format "{{.Status}}")
+            echo $status
+            if [[ $status == *"healthy"* ]]; then
+              echo "MySQL container is up and running."
+              break
+            fi
+            retries=$((retries-1))
+            sleep 5
+          done
+          if [ $retries -eq 0 ]; then
+            echo "Timed out waiting for MySQL container to start."
+            exit 1
+          fi
+
+      - name: Prepare test database
+        run: yarn prepare-testing-database
+
+      - name: Generation integration tests
+        run: yarn tests-duplicator
+
+      - name: Integration tests
+        run: yarn test:integration

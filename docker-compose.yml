@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  mysql:
+    image: mysql:8.0.23
+    restart: on-failure
+    environment:
+      MYSQL_DATABASE: backend
+      MYSQL_ROOT_PASSWORD: typeorm
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --sql_mode="ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+
+volumes:
+  mysql: ~
