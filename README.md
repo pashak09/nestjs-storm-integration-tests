@@ -1,8 +1,10 @@
 # NestJS Integration Test Sample
 
 Do you think running integration tests is a pain and takes a lot of time waiting for the testing stage to
-complete? Let me give you a little hint on how you can change that. I'll show you how to run around **3,000** tests in
-**~2** minutes. You can take a look at the pipeline .
+complete? Let me give you a little hint on how you can change that. I'll show you how to run **3,000** tests in
+**~2-3** minutes in this repo. Take a look at the
+[pipeline](https://github.com/pashak09/nestjs-storm-integration-tests/actions/runs/5104796740/jobs/9175968363) at the
+**Integration tests** step.
 
 The repository serves as an example of how to run integration tests. **Here, you won't find examples of building the
 application structure or any accepted coding practices**. The purpose of this repository is to present my approach to
@@ -31,7 +33,7 @@ If you liked this implementation, don't forget to put your **★** to this proje
 To clone the repository:
 
 ```bash
-git clone 
+git clone https://github.com/pashak09/nestjs-storm-integration-tests
 ```
 
 To install the packages:
